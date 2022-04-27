@@ -16,11 +16,11 @@ def solar_geo(t, lat, lon, zone):
 	long	= 1x1 value of longitude (+E, -W)
 	zone	= 1x1 value of time zone from GMTdef solar_geo():   
     '''
-    YYYY = t.dt.year
+    YYYY = t.year
     # Find integar Julian Day    
-    JD = np.floor(t.dt.dayofyear)
+    JD = np.floor(t.dayofyear)
     # Find decimal hour
-    HHMM = t.dt.hour + t.dt.minute / 60
+    HHMM = t.hour + t.minute / 60
     # Call sunang
     [ela, az, soldist, dec, ha] = sunang(YYYY, JD, HHMM+zone, lat, lon)
 
@@ -55,34 +55,39 @@ def avg_el(dates, lat, lon, tz, ref):
     	EL		= Nx1 vector - Average elevation angle [degrees above horizon]
     '''
     rm_lp = len(dates[(dates.dt.month==2) & (dates.dt.day==29)]) == 0    
-    dt = abs(np.diff(dates)).mean()/ np.timedelta64(1, 'D')
-    
+    dt = abs(np.diff(dates)).mean()/ np.timedelta64(1, 's')
+
     if ref == "BEG":
-        dt = -timedelta(dt)
+        dates -= timedelta(seconds=0)
     elif ref == "MID":
-        dt = timedelta(dt)/2
+        dates -= timedelta(seconds=dt/2)
     elif ref == "END":
-        dt = timedelta(0)
+        dates -= timedelta(seconds=dt)
+        
     else:
-        print("Unrecognized REF option")
+        print("Unrecognzed REF option")
         raise RuntimeError from None
     
     # Instantaneous Elevation Angle
-    t_fine =  pd.date_range(dates[0], dates.iloc[-1]-dt, freq='5min')
-
+    t_fine = pd.date_range(dates[0], dates.iloc[-1], freq='5min')    
+    
     # Calculate solar geometry for fine time step
     ela_fine = solar_geo(t_fine, lat, lon, tz)
-    mew_fine = np.sin(np.deg2rad(ela_fine))
-
+    mew_fine = pd.DataFrame(data = np.sin(np.deg2rad(ela_fine)),
+                            index = t_fine, columns = ['ela'])
+    
     # Average Elevation angle
-    cosSZA = mew_fine.resample().mean()
+    cosSZA = mew_fine[mew_fine>0].resample(timedelta(seconds=dt)).mean()
     cosSZA = cosSZA.fillna(0)
+    pd.DataFrame(cosSZA).to_csv('cossza.csv', header=False, index=False)
+
     
     # Convert from avg(cos(SZA)) to elevation angle
-    ela = np.arcsin(np.deg2rad(cosSZa))
+    ela = np.rad2deg(np.arcsin(cosSZA))
 
     if len(ela) != len(dates):
-        print(rm_lp, "Dims do not match")
+        print("Remove leap:", rm_lp)
+        print("Dims do not match", len(ela), len(dates))
         raise RuntimeError from None
 
-    return ela
+    return ela.ela.values
