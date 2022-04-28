@@ -66,7 +66,7 @@ def get_LW(lat, lon, elev, dates, df, LWall_i, LWclr_i):
 
 # get LW (Dilley and O'Brien + Unsworth and Monteith (1975))
 # (needs to be done with the temp correction applied)    
-def fix_lw(ifile, elev):
+def est_lw(ifile, elev):
     lat = os.path.basename(ifile).split('_')[1]
     lon = os.path.basename(ifile).split('_')[2]
     print("Read file: ", ifile)
@@ -105,7 +105,7 @@ def main():
     #get_LW()
     ifile = "/home/disk/rocinante/DATA/temp/kcp3/data/interp_pnnl/test/bogachiel/access1.0_RCP45/data_47.81651_-124.35223"
     elev = 185.30138
-    fix_lw(ifile, elev)
+    est_lw(ifile, elev)
     
         
 if __name__ == "__main__":

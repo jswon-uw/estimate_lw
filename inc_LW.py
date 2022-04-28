@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 
 ## Constants
 stefan = 5.67 * (10**-8)      # Stefan-Boltzmann constant (J/s/m^2/K^4)
@@ -10,7 +9,6 @@ def inc_LW_e_clr(df, elev, m_clr):
     # Prata (1996) approximation for precipitable water
     # NOTE: corrected to be 465 instead of 4650 (error in Flerchinger Table 1)
     w = 465 * (df.eo / df.TEMP) 
-    pd.DataFrame(w).to_csv('w.csv', index=False, header=False)
     
     if m_clr == 1:
         # 1 == Angstrom (1918)
@@ -24,6 +22,18 @@ def inc_LW_e_clr(df, elev, m_clr):
         # 3 = Brutsaert (1975)
         P = [1.723, 1/7]
         e_clr = P[0] * (df.eo / df.TEMP) ** (P[1])
+    elif m_clr == 4:
+        # 4 = Garatt (1992)
+        P = [0.79, 0.17, 0.96]
+        e_clr = P[0] * (df.eo/df.TEMP) ** P[1]
+    elif m_clr == 5:
+        # 5 = Idso and Jackson (1969) (Idso-1)
+        P = [0.261, 0.0077]
+        e_clr = 1 - P[0] * np.exp(-1 * P[1] * (df.TEMP - T_C2K) ** 2)
+    elif m_clr == 6:
+        # 6 = Idso (1981) (Idso-2)
+        P = [0.70, 5.95 * 10**-4, 1500]
+        e_clr =P[0] + P[1] * df.eo * np.exp(P[2] / df.TEMP)
     elif m_clr == 7:
         # 7 = Iziomon et al. (2003)
         P = [0.35, 100, 212,     # Low Land sites 
@@ -33,15 +43,73 @@ def inc_LW_e_clr(df, elev, m_clr):
         X = Mxz * (elev - P[2]) + P[0]
         Y = Myz * (elev - P[2]) + P[1]
         e_clr = 1 - X * np.exp(-Y * df.eo/df.TEMP)
+    elif m_clr == 8:
+        # 8 = Keding (1989)
+        P = [0.92, 0.7, 1.2]
+        e_clr = P[0] - P[1] * (10 ** (-1 * P[2] * df.eo))
+    elif m_clr == 9:
+        # 9 = Niemela et al. (2001)
+        P = [0.72, 0.09, 0.2, 0.76]
+        e_clr = P[0] + P[1] * (df.eo - P[2])
+        e_clr[df.eo < P[2]] = P[0] - P[3] * (df.eo[df.eo < P[2]]- P[2]) # Valid syntax?
+    elif m_clr == 10:
+        # 10 = Prata (1996)
+        P = [1.2, 3, 0.5]
+        e_clr = 1 - (1 + w) * np.exp(-1 * (P[0] + P[1] * w) ** P[2])
+    elif m_clr == 11:
+        # 11 = Satterlund (1979)
+        P = [1.08, 2016]
+        e_clr = P[0] * (1 - np.exp(-((10*df.eo) ** df.TEMP / P[1])))
+        # NOTE: Corrected so taht P2 parameter is in the exponent ^(Ta/P2)
+        # Error in Flerchinger Table 1
+    elif m_clr == 12:
+        # 12 =Swinbank (1963)
+        P = [5.31 * 10**-13, 6]
+        Lclr = P[0] * (df.TEMP ** P[1])
+        e_clr = Lclr / (stefan * (df.TEMP ** 4)) # Effective emissivity
     elif m_clr == 13:
         # 13 = Dilley and O'Brien (1998)
         P = [59.38, 113.7, 96.96]
         # Note: corrected to be 2.5 instead of 25 (error in Flerchinger Table 1)
         Lclr = P[0] + P[1] * ((df.TEMP / T_C2K) ** 6) + P[2] * np.sqrt(w/2.5)
-        print(Lclr)
         e_clr = Lclr / ((stefan) * (df.TEMP ** 4)) # Effective emissivity
-        print(df.TEMP)
-        print(e_clr)
+    elif m_clr == 14:
+        # 14 = Maykut and Church (1973)
+        P = [0.7855]
+        e_clr = P[0]
+    elif m_clr == 15:
+        # 15 = Konzelmann et al. (1994)
+        P = [0.23, 0.484, 1.8]
+        e_clr = P[0] + P[1] * (1000 * df.eo / df.TEMP) ** (P[2])
+    elif m_clr == 16:
+        # 16 = Dille and O'Brien (A) (1998)
+        P = [2.232, -1.875, 0.7356]
+        e_clr = 1 - np.exp(-1.66 * (P[0] + P[1] * (df.TEMP/T_C2K) + P[2] * np.sqrt(w/2.5)))
+    elif m_clr == 17:
+        # 17 = Campbell and Norman (1998) as cited by Walter at al (2005)
+        P = [0.72 - 0.005 * T_C2K, 0.005] # modified so Ta is in (K) instead of (C) ... should be -0.6458 after the math
+        e_clr = P[0] + P[1] * df.TEMP
+    elif m_clr == 18:
+        # 18 = Long and Turner (2008) - based on Brutsaert (1975)
+        P = [1.18,                 # daytime k value, varies diurnally (and likely spatially) - see Fig 2
+             1.28,                 # nighttime k value
+             (1.39*10**-11 + 3.36*10**-12 + 1.47*10**-11 + 4.07*10**-12) / 4,  # "a" coefficient - average of four datasets
+             (4.8769 + 5.1938 + 4.8768 + 5.1421) / 4,                          # "b" coefficient - average of four datasets
+             (1/7)]                # brutsaert exponent
+        k_array = df.TEMP * 0 + P[0] # Set all values to daytime k
+        # Introducing Qsi?
+        #if isfield(M_INPUTS, 'Qsi')==1
+        #k_array(M_INPUTS.Qsi<50) = M_PARAMS.P2_clr;      % set night time values to night k
+        Ccoeff = k_array + P[2] * (df.RH * 100) ** P[3]
+        e_clr = Ccoeff * (df.eo * 10 / df.TEMP) ** P[4]   # Times 10 to convert from kPa to mb
+    elif m_clr == 19:
+        # 19 = Ohmura (1982) as cited by Howard and Stull (2013)
+        P = [8.733 * 10**-3, 0.788]
+        e_clr = P[0] * df.TEMP ** (P[1])
+    elif m_clr == 20:
+        # 20 = Efimova (1961) as cited by Key et al (1996)
+        P = [0.746, 0.0066*10]
+        e_clr = P[0] + P[1] * df.eo
     else:
         print("Error: Invalid clear-sky option specified")
         raise RuntimeError from None
@@ -276,8 +344,13 @@ def calc_inc_LW(df, elev, m_all, m_clr, m_vpr):
     if df.RH.mean() > 1:
         print("Assuming RH input was in percent. Converting to fractional")
         df.RH /= 100
-        
 
+    if m_all != 7:
+        print("Warning: Longwave estimate only tested for all-sky option 7.")
+
+    if m_clr != 13:
+        print("Warning: Longwave estimate only tested for clear-sky option 13.")
+        
     if m_vpr == 0:
         if 'eo' not in df.columns:
             print("eo must be provided in inputs, or include RH and specify method for computing eo")
@@ -298,121 +371,6 @@ def calc_inc_LW(df, elev, m_all, m_clr, m_vpr):
     else:
         print("Invalid vapor pressure option specified")
         raise RuntimeError from None
-
     
     return inc_LW_e_all(df, elev, m_all, m_clr)
     
-
-
-    
-'''    
-%%% First, calculate clear-sky emissivity for the selected method
-e_clr = inc_LW_e_clr(M_INPUTS, M_PARAMS, M_OPTIONS);
-
-%%% double check to make sure we have e_clr within realistic limits [0 1]
-e_clr(e_clr<0) = 0;
-e_clr(e_clr>1) = 1;
-
-%%% Now, calculate all-sky emissivity
-if M_OPTIONS.Method_all==1
-    % 1 = Brutsaert (1982)
-    e_all = (1+ M_PARAMS.P1_all .*c).*e_clr;
-elseif M_OPTIONS.Method_all==2
-    % 2 = Iziomon et al. (2003)
-    Mzz = (M_PARAMS.P3_all-M_PARAMS.P1_all)/(M_PARAMS.P4_all-M_PARAMS.P2_all);
-    Z = Mzz .*(M_PARAMS.STA_Elev - M_PARAMS.P2_all) + M_PARAMS.P1_all;
-    e_all = (1+Z.*c.^M_PARAMS.P5_all).*e_clr;
-elseif M_OPTIONS.Method_all==3
-    % 3 = Jacobs (1978)
-    e_all = (1+ M_PARAMS.P1_all .*c).*e_clr;
-elseif M_OPTIONS.Method_all==4
-    % 4 = Keding (1989)
-    e_all = (1+ M_PARAMS.P1_all .*c.^M_PARAMS.P2_all).*e_clr;
-elseif M_OPTIONS.Method_all==5
-    % 5 = Maykut and Church (1973)
-    e_all = (1+ M_PARAMS.P1_all .*c.^M_PARAMS.P2_all).*e_clr;
-elseif M_OPTIONS.Method_all==6
-    % 6 = Sugita and Brutsaert (1993)
-    e_all = (1+ M_PARAMS.P1_all .*c.^M_PARAMS.P2_all).*e_clr;
-elseif M_OPTIONS.Method_all==7
-    % 7 = Unsworth and Monteith (1975)
-    e_all = (1-M_PARAMS.P1_all.*c).*e_clr + M_PARAMS.P2_all.*c;
-elseif M_OPTIONS.Method_all==8
-    % 8 = Kimball et al. (1982)
-    Tc = Ta - M_PARAMS.P1_all; %%% no seasonal variation in Tc yet... could add in later
-    f8 = M_PARAMS.P2_all + M_PARAMS.P3_all.*Tc - M_PARAMS.P4_all.* Tc.^2;
-    e8z = M_PARAMS.P5_all + M_PARAMS.P6_all .* eo.^2 .* exp(M_PARAMS.P7_all./Ta);
-    tau8 = 1- e8z.*(M_PARAMS.P8_all-M_PARAMS.P9_all.*e8z);
-    
-    Lclr = e_clr.*stefan.*Ta.^4;
-    
-    Ld = Lclr + tau8.*c.*f8.*stefan.*(Tc.^4);
-    
-    e_all = Ld./(stefan.*(Tc.^4));  % effective emissivity
-    
-    %%% make sure e_all is in realistic limits [0 1]
-    e_all(e_all<0) = 0;
-    e_all(e_all>1) = 1;
-    
-    %%% recalculate Ld
-    LWdwn = e_all.*stefan.*(Tc.^4);        % note it is Tc not Ta for this method
-    
-%     % 8 = Kimball et al. (1982)
-%     nparams = 9;
-%     P(1) = 11; P(2) = -0.6732; P(3) = 0.6240 .* (10^-2); P(4) = 0.9140 .* (10^-5);
-%     P(5) = 0.24; P(6) = 2.98 .* (10^-6); P(7) = 3000; P(8) = 1.4; P(9) = 0.4;
-elseif M_OPTIONS.Method_all==9
-    % 9 = Crawford and Duchon (1999)
-    e_all = (1-s) + s.*e_clr;
-elseif M_OPTIONS.Method_all==10
-    % 10 = Lhomme et al. (2007)
-    e_all = (M_PARAMS.P1_all - M_PARAMS.P2_all.*s).*e_clr;
-elseif M_OPTIONS.Method_all==11
-    % 11 = Bolz (1949)
-    e_all = e_clr.*(1+M_PARAMS.P1_all.*c.^M_PARAMS.P2_all);
-elseif M_OPTIONS.Method_all==12
-    % 12 = Konzelmann et al (1994)
-    e_all = e_clr .*(1-c.^M_PARAMS.P1_all)+(M_PARAMS.P2_all.*c.^M_PARAMS.P1_all);
-elseif M_OPTIONS.Method_all==13
-    % 13 = Sicart et al (2006) (eqn 9, daily average transmissivity)
-    if numel(tau)>1
-        tauD = TimeAverage(M_INPUTS.TIME,tau,'DAY');
-    else
-        tauD = tau;
-    end
-    e_all = e_clr.*(1+ M_PARAMS.P1_all.*RH - M_PARAMS.P2_all .* tauD);
-elseif M_OPTIONS.Method_all==14
-    % 14 = Pirazzini et al (2000) as cited by Gubler (eqn 21)
-    e_all = e_clr.*(1+ M_PARAMS.P1_all.*c.^M_PARAMS.P2_all);
-elseif M_OPTIONS.Method_all==15
-    % 15 = Pirazzini et al (2000) as cited by Gubler (eqn 22)
-    e_all = e_clr.*(1-c.^M_PARAMS.P2_all) + M_PARAMS.P1_all.*c.^M_PARAMS.P3_all;
-elseif M_OPTIONS.Method_all==16
-    % 16 = Gubler et al (2012) eqn 23
-    if numel(tau)>1
-        tauD = TimeAverage(M_INPUTS.TIME,tau,'DAY');
-    else
-        tauD = tau;
-    end
-    e_all= (e_clr.*tauD.^M_PARAMS.P3_all) + M_PARAMS.P1_all.*(1-tauD.^M_PARAMS.P2_all);
-elseif M_OPTIONS.Method_all==17
-    % 17 = Zillman (1972) as cited by Key et al (1996)
-    e_all = e_clr + M_PARAMS.P1_all.*(1-M_PARAMS.P2_all).*c;
-elseif M_OPTIONS.Method_all==18
-    % 18 = Duarte et al (2006) eqn 22 - same form as Konzelmann
-    e_all = e_clr .*(1-s.^M_PARAMS.P1_all)+(M_PARAMS.P2_all.*s.^M_PARAMS.P1_all);
-elseif M_OPTIONS.Method_all==19
-    % 19 = Kruk et al (2010) eqn 18 - same form as Bolz, Duarte et al eqn 21, etc
-    e_all = e_clr.*(1+M_PARAMS.P1_all.*s.^M_PARAMS.P2_all);
-elseif M_OPTIONS.Method_all==20
-    % 20 = TVA (1972) as cited by Bras (1990) - same form as Bolz
-    e_all = e_clr.*(1+M_PARAMS.P1_all.*c.^M_PARAMS.P2_all);
-end
-
-if M_OPTIONS.Method_all ~= 8
-    %%% make sure e_all is in realistic limits [0 1]
-    e_all(e_all<0) = 0;
-    e_all(e_all>1) = 1;
-    LWdwn = e_all.*stefan.*Ta.^4;
-end
-'''
