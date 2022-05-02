@@ -79,8 +79,6 @@ def avg_el(dates, lat, lon, tz, ref):
     # Average Elevation angle
     cosSZA = mew_fine[mew_fine>0].resample(timedelta(seconds=dt)).mean()
     cosSZA = cosSZA.fillna(0)
-    pd.DataFrame(cosSZA).to_csv('cossza.csv', header=False, index=False)
-
     
     # Convert from avg(cos(SZA)) to elevation angle
     ela = np.rad2deg(np.arcsin(cosSZA))
